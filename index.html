@@ -37,6 +37,7 @@
         
         .btn-add { background: #d4af37; color: #000; border: none; padding: 12px; border-radius: 10px; width: 100%; font-weight: bold; cursor: pointer; margin-bottom: 20px; }
         .btn-del { background: #333; border: none; color: #ff4444; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-edit { background: #444; border: none; color: #fff; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-right: 5px; }
 
         .notif { position: fixed; top: 20px; right: 20px; background: #d4af37; color: #000; padding: 15px 25px; border-radius: 12px; font-weight: bold; z-index: 999; }
     </style>
@@ -65,14 +66,12 @@
 
     <div id="sec-equipe" class="section">
         <button class="btn-add" onclick="adicionarEquipe()">+ Novo Barbeiro</button>
-        <div id="listaEquipe" class="mgmt-list">
-            </div>
+        <div id="listaEquipe" class="mgmt-list"></div>
     </div>
 
     <div id="sec-servicos" class="section">
         <button class="btn-add" onclick="adicionarServico()">+ Novo Serviço/Produto</button>
-        <div id="listaServicos" class="mgmt-list">
-            </div>
+        <div id="listaServicos" class="mgmt-list"></div>
     </div>
 </div>
 
@@ -84,7 +83,6 @@
 
     document.getElementById('filtroData').valueAsDate = new Date();
 
-    // Lógica de Navegação
     function openTab(evt, sectionName) {
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -95,7 +93,6 @@
         if(sectionName === 'sec-servicos') listarServicos();
     }
 
-    // --- GESTÃO DE AGENDAMENTOS (MANTIDA) ---
     async function listarAgendamentos() {
         const dataBusca = document.getElementById('filtroData').value;
         const { data, error } = await _supabase.from('agendamentos').select('*').eq('data', dataBusca).order('hora', { ascending: true });
@@ -121,7 +118,6 @@
         if (confirm("Cancelar?")) { await _supabase.from('agendamentos').delete().eq('id', id); listarAgendamentos(); }
     }
 
-    // --- GESTÃO DE EQUIPE (NOVO) ---
     async function listarEquipe() {
         const { data } = await _supabase.from('equipe').select('*').order('nome');
         const container = document.getElementById('listaEquipe');
@@ -144,7 +140,6 @@
         if(confirm("Remover da equipe?")) { await _supabase.from('equipe').delete().eq('id', id); listarEquipe(); }
     }
 
-    // --- GESTÃO DE SERVIÇOS (NOVO) ---
     async function listarServicos() {
         const { data } = await _supabase.from('servicos').select('*').order('nome');
         const container = document.getElementById('listaServicos');
@@ -153,7 +148,10 @@
             container.innerHTML += `
                 <div class="mgmt-item">
                     <div class="client-info"><b>${s.nome}</b><small>Preço Base: R$ ${s.preco || '0,00'}</small></div>
-                    <button class="btn-del" onclick="removerServico('${s.id}')">Remover</button>
+                    <div style="display:flex;">
+                        <button class="btn-edit" onclick="editarServico('${s.id}', '${s.nome}', '${s.preco}')">Editar</button>
+                        <button class="btn-del" onclick="removerServico('${s.id}')">Remover</button>
+                    </div>
                 </div>`;
         });
     }
@@ -162,6 +160,15 @@
         const nome = prompt("Nome do Serviço (ex: Corte Degradê):");
         const preco = prompt("Preço (apenas números):");
         if(nome) { await _supabase.from('servicos').insert([{ nome, preco }]); listarServicos(); }
+    }
+
+    async function editarServico(id, nomeAtual, precoAtual) {
+        const novoNome = prompt("Novo nome do serviço:", nomeAtual);
+        const novoPreco = prompt("Novo preço:", precoAtual);
+        if(novoNome && novoPreco) {
+            await _supabase.from('servicos').update({ nome: novoNome, preco: novoPreco }).eq('id', id);
+            listarServicos();
+        }
     }
 
     async function removerServico(id) {
@@ -174,7 +181,6 @@
         if(hora) { await _supabase.from('agendamentos').insert([{ data, hora, nome_cliente: 'BLOQUEADO', barbeiro: 'ADMIN', servico: 'INDISPONÍVEL' }]); listarAgendamentos(); }
     }
 
-    // Realtime
     _supabase.channel('changes').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'agendamentos' }, payload => {
         somNotificacao.play();
         listarAgendamentos();
